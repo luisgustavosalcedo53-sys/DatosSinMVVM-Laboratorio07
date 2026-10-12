@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScreenUser() {
 
@@ -31,84 +32,130 @@ fun ScreenUser() {
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var dataUser by remember { mutableStateOf("") }
+    var mensaje by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
+    // Función para actualizar la lista
+    suspend fun actualizarUsuarios() {
+        val users = dao.getAll()
+        dataUser = users.joinToString("\n") {
+            "${it.uid} - ${it.firstName} ${it.lastName}"
+        }
+    }
 
-        Spacer(modifier = Modifier.height(30.dp))
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("Registro de Usuarios")
+                },
+                actions = {
 
-        Text(
-            text = "Registro de Usuarios",
-            style = MaterialTheme.typography.headlineMedium
-        )
+                    TextButton(
+                        onClick = {
+                            if (firstName.isNotBlank() &&
+                                lastName.isNotBlank()
+                            ) {
+                                val user = User(
+                                    firstName = firstName.trim(),
+                                    lastName = lastName.trim()
+                                )
 
-        Spacer(modifier = Modifier.height(20.dp))
+                                coroutineScope.launch {
+                                    dao.insert(user)
+                                    actualizarUsuarios()
+                                    mensaje = "Usuario agregado"
+                                    firstName = ""
+                                    lastName = ""
+                                }
+                            } else {
+                                mensaje = "Complete los campos"
+                            }
+                        }
+                    ) {
+                        Text("Agregar")
+                    }
 
-        OutlinedTextField(
-            value = firstName,
-            onValueChange = { firstName = it },
-            label = { Text("Nombre") },
-            singleLine = true
-        )
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                actualizarUsuarios()
+                                mensaje = "Lista actualizada"
+                            }
+                        }
+                    ) {
+                        Text("Listar")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
 
-        OutlinedTextField(
-            value = lastName,
-            onValueChange = { lastName = it },
-            label = { Text("Apellido") },
-            singleLine = true
-        )
+            OutlinedTextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        Button(
-            onClick = {
-                if (firstName.isNotBlank() &&
-                    lastName.isNotBlank()
-                ) {
-                    val user = User(
-                        firstName = firstName.trim(),
-                        lastName = lastName.trim()
-                    )
+            OutlinedTextField(
+                value = lastName,
+                onValueChange = { lastName = it },
+                label = { Text("Apellido") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Button(
+                onClick = {
                     coroutineScope.launch {
-                        dao.insert(user)
-                    }
+                        val ultimo = dao.getLastUser()
 
-                    firstName = ""
-                    lastName = ""
-                }
-            }
-        ) {
-            Text("Agregar Usuario")
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    val users = dao.getAll()
-
-                    dataUser = users.joinToString("\n") {
-                        "${it.uid} - ${it.firstName} ${it.lastName}"
+                        if (ultimo != null) {
+                            dao.deleteUserById(ultimo.uid)
+                            actualizarUsuarios()
+                            mensaje = "Último usuario eliminado"
+                        } else {
+                            mensaje = "No hay usuarios para eliminar"
+                        }
                     }
                 }
+            ) {
+                Text("Eliminar último usuario")
             }
-        ) {
-            Text("Listar Usuarios")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = mensaje,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Usuarios registrados:",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = dataUser,
+                style = MaterialTheme.typography.bodyLarge
+            )
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = dataUser,
-            style = MaterialTheme.typography.bodyLarge
-        )
     }
 }
